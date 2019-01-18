@@ -10,8 +10,7 @@ from datetime import timedelta
 import voluptuous as vol
 
 from homeassistant.components.sensor import PLATFORM_SCHEMA
-from homeassistant.const import (
-    CONF_NAME, CONF_HOST, CONF_SCAN_INTERVAL)
+from homeassistant.const import (CONF_NAME, CONF_HOST, CONF_SCAN_INTERVAL)
 from homeassistant.helpers.entity import Entity
 from homeassistant.util import Throttle
 import homeassistant.helpers.config_validation as cv
@@ -24,44 +23,12 @@ _LOGGER = logging.getLogger(__name__)
 _RESOURCE = 'http://{}/en/status.xml'
 url = ""
 
-
+CONF_PHASES = "phases"
+DEFAULT_PHASES = 3
+DEFAULT_SCAN_INTERVAL = 10
 DEFAULT_METHOD = 'GET'
 DEFAULT_NAME = 'Wibeee Energy Consumption Sensor'
 
-#	Vrms</td>
-#	"vrms"></td>
-#	Irms</td>
-#	"irms"></td>
-#	Frequency</td>
-#	"frecuencia"></td>
-#	Active Power</td>
-#	"p_activa"></td>
-#	Inductive Reactive Power</td>
-#	"p_reactiva_ind"></td>
-#	Capacitive Reactive Power</td>
-#	"p_reactiva_cap"></td>
-#	Apparent Power</td>
-#	"p_aparent"></td>
-#	Power Factor</td>
-#	"factor_potencia"></td>
-#	Active Energy</td>
-#	"energia_activa"></td>
-#	Inductive Reactive Energy</td>
-#	"energia_reactiva_ind"></td>
-#	Capacitive Reactive Energy</td>
-#	"energia_reactiva_cap"></td>
-#
-# <fase1_vrms>239.63</fase1_vrms>
-#<fase1_irms>0.86</fase1_irms>
-#<fase1_p_aparent>205.10</fase1_p_aparent>
-#<fase1_p_activa>19.45</fase1_p_activa>
-#<ease1_p_reactiva_ine>197.52</fase1_p_reactiva_ind>
-#<fase1_p_reactiva_cap>0.00</fase1_p_reactiva_cap>
-#<fase1_frecuencia>50.02</fase1_frecuencia>
-#<fase1_factor_potencia>-0.095</fase1_factor_potencia>
-#<fase1_energia_activa>30264.84</fase1_energia_activa>
-#<fase1_energia_reactiva_ind>87130.35</fase1_energia_reactiva_ind>
-#<fase1_energia_reactiva_cap>8066.87</fase1_energia_reactiva_cap>
 
 MIN_TIME_BETWEEN_UPDATES = timedelta(seconds=10)   # Default value
 
@@ -73,19 +40,24 @@ SENSOR_TYPES = {
     'p_reactiva_ind': ['Inductive Reactive Power', 'VArL'],
     'p_reactiva_cap': ['Capacitive Reactive Power', 'VArC'],
     'p_aparent': ['Apparent Power', 'VA'],
-    'factor_potencia': ['Power Factor', ' '],
+    'factor_potencia': ['Power Factor', 'PF'],
     'energia_activa': ['Active Energy', 'Wh'],
     'energia_reactiva_ind': ['Inductive Reactive Energy', 'VArLh'],
     'energia_reactiva_cap': ['Capacitive Reactive Energy', 'VArCh']
 }
 
+PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
+    vol.Required(CONF_HOST): cv.string,
+    vol.Optional(CONF_NAME, default=DEFAULT_NAME): cv.string,
+    vol.Optional(CONF_PHASES, default=DEFAULT_PHASES): int,
+})
 
 def setup_platform(hass, config, add_devices, discovery_info=None):
     """Set up the RESTful sensor."""
     name = config.get(CONF_NAME)
     host = config.get(CONF_HOST)
     scan_interval = config.get(CONF_SCAN_INTERVAL)
-
+    phases = config.get(CONF_PHASES)
 
     # Create a data fetcher. Then make first call
     try:
@@ -99,15 +71,20 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
     tree = ElementTree.fromstring(wibeee_data.data)
 
     devices = []
+
     for item in tree:
         sensor_id = item.tag
         sensor_phase,sensor_name = item.tag.split("_",1)
         sensor_phase = sensor_phase.replace("fase","")
+        if int(sensor_phase) > phases:
+            break
         sensor_value = item.text
 
         _LOGGER.info("Adding sensor %s with value %s", sensor_id, sensor_value)
 
-        devices.append(WibeeeSensor(hass, wibeee_data, name, sensor_id, sensor_phase, sensor_name,sensor_value))
+        wanted_parameters = ["vrms", "irms", "frecuencia", "p_activa"]
+        if sensor_name in wanted_parameters:
+            devices.append(WibeeeSensor(hass, wibeee_data, name, sensor_id, sensor_phase, sensor_name,sensor_value))
 
     add_devices(devices, True)
 
