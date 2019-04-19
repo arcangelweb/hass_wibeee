@@ -31,7 +31,7 @@ Example XML are listed in hithub repository
 
 1.- Copy custom comonent into 
 ```
-<hass_folder>/custom_components/sensor/wibeee.py
+<hass_folder>/custom_components/wibeee/sensor.py
 ```
 
 2.- Add device to home assistant configuration file configuration.yaml
